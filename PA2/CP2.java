@@ -15,8 +15,10 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
-public abstract class CP1 {
+public abstract class CP2 {
 	private static byte[] nonce = new byte[32];
     private static byte[] encryptedNonce = new byte[128];
 	public static void main(String[] args) {
@@ -97,6 +99,25 @@ public abstract class CP1 {
 			}
 			///////// AP end
 
+			// gen session key
+			SecretKey sessKey = KeyGenerator.getInstance("AES").generateKey();
+			Cipher sessCipherSettings = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			sessCipherSettings.init(Cipher.ENCRYPT_MODE, sessKey);
+			byte[] encodedSessKey = sessKey.getEncoded();
+
+			Cipher rsaCipherSettings = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			rsaCipherSettings.init(Cipher.ENCRYPT_MODE, publickey);
+			
+			// send sessionkey (AES symmetric key) to the server
+			byte[] encryptSessionKey = rsaCipherSettings.doFinal(encodedSessKey);
+
+			System.out.println("Send session key to server");
+			toServer.writeInt(3);
+			toServer.writeInt(encryptSessionKey.length);
+			toServer.write(encryptSessionKey);
+			toServer.flush();
+			System.out.println("Session key sent...");
+
 			//////////  sending multiple files using for loop
 			for (int i = 0; i < args.length; i ++) {
 				System.out.println("Sending file...");
@@ -119,10 +140,13 @@ public abstract class CP1 {
 					numByte = bufferedFileInputStm.read(fromFileBuffer);
 					finishedFile = numByte < 117;
 
-					// encrypt using Public key for CP1
-					Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, publickey);
-					byte[] encryptFromFileBuffer = cipher.doFinal(fromFileBuffer);
+					// // encrypt using Public key for CP1
+					// Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+					// cipher.init(Cipher.ENCRYPT_MODE, publickey);
+					// byte[] encryptFromFileBuffer = cipher.doFinal(fromFileBuffer);
+
+					// use session cypher instead
+					byte[] encryptFromFileBuffer = sessCipherSettings.doFinal(fromFileBuffer);
 					int encryptLengthBytes = encryptFromFileBuffer.length;
 
 					toServer.writeInt(1);
