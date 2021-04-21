@@ -35,8 +35,8 @@ public abstract class SP2 {
 
 		try {
 			PrivateKey privateKey = PrivateKeyReader("private_key.der");
-			SecretKey sessionkey;
-			Cipher sessionKeyCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			SecretKey sessKey;
+			Cipher sessKeyCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 			welcomeSocket = new ServerSocket(port);
 			connectionSocket = welcomeSocket.accept();
 			fromClient = new DataInputStream(connectionSocket.getInputStream());
@@ -47,7 +47,7 @@ public abstract class SP2 {
 
 				int packetType = fromClient.readInt();
 				
-				// Indicate start of AP
+				/////////// Indicate start of AP
 				if (packetType == 2) {
 					System.out.println("Starting Authentication Protocol with client");
 					InputStream fis = new FileInputStream("certificate_1004238.crt");
@@ -57,25 +57,24 @@ public abstract class SP2 {
 					// PublicKey key = serverCert.getPublicKey();
 
 					// get nonce from client
-					System.out.println("Get nonce from client");
+					System.out.println("Retrieve nonce from client");
 					fromClient.read(nonce);
-					// encrypt nonce for client
-					System.out.println("Encrypt nonce for client");
-					Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-					byte[] encryptedNonce = cipher.doFinal(nonce);
+					Cipher cipherSettings = Cipher.getInstance("RSA/ECB/PKCS1Padding"); // encrypt nonce for client
+					cipherSettings.init(Cipher.ENCRYPT_MODE, privateKey);
+					byte[] encryptedNonce = cipherSettings.doFinal(nonce);
+					
 					// send nonce to client
 					System.out.println("Sent encrypted nonce to client");
 					toClient.write(encryptedNonce);
 					toClient.flush();
 
-					// * send cert to client
-					System.out.println("Sent encoded cert to client");
+					// send cert to client
+					System.out.println("Sending the encoded cert to client");
 					// toClient.writeInt(serverCertEncoded.length);
 					toClient.write(serverCertEncoded);
 					toClient.flush();
 
-					// * Authentication Protocol done after client verifies
+					/////////// AP done
 				} 
 
 				// check if using session key
@@ -83,16 +82,17 @@ public abstract class SP2 {
 					System.out.println("Receiving session key from client");
 					int encryptSessionKeySize = fromClient.readInt();
 					byte[] encryptSessionKey = new byte[encryptSessionKeySize];
-					//
+					// Must use read fully!
+					// See: https://stackoverflow.com/questions/25897627/datainputstream-read-vs-datainputstream-readfully
 					fromClient.readFully(encryptSessionKey, 0, encryptSessionKeySize);
 
 					System.out.println("Session Key received");
-					Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-					decipher.init(Cipher.DECRYPT_MODE, privateKey);
+					Cipher decipherSettings = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+					decipherSettings.init(Cipher.DECRYPT_MODE, privateKey);
 					//? 1. decrypt symmetric (session) key with private key
-					byte[] decryptSessionKeyByte = decipher.doFinal(encryptSessionKey);
-					sessionkey = new SecretKeySpec(decryptSessionKeyByte, 0, decryptSessionKeyByte.length, "AES");
-					sessionKeyCipher.init(Cipher.DECRYPT_MODE, sessionkey);
+					byte[] decryptSessionKeyByte = decipherSettings.doFinal(encryptSessionKey);
+					sessKey = new SecretKeySpec(decryptSessionKeyByte, 0, decryptSessionKeyByte.length, "AES");
+					sessKeyCipher.init(Cipher.DECRYPT_MODE, sessKey);
 				}
 
 				// If the packet is for transferring the filename
@@ -102,8 +102,6 @@ public abstract class SP2 {
 
 					int numBytes = fromClient.readInt();
 					byte [] filename = new byte[numBytes];
-					// Must use read fully!
-					// See: https://stackoverflow.com/questions/25897627/datainputstream-read-vs-datainputstream-readfully
 					fromClient.readFully(filename, 0, numBytes);
 
 					fileOutputStream = new FileOutputStream("recv_" + new String(filename, 0, numBytes));
@@ -120,7 +118,7 @@ public abstract class SP2 {
 					// Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 					// decipher.init(Cipher.DECRYPT_MODE, privateKey);
 					// byte[] decryptBlock = decipher.doFinal(block);
-					byte[] decryptBlock = sessionKeyCipher.doFinal(block);
+					byte[] decryptBlock = sessKeyCipher.doFinal(block);
 
 					if (numBytes > 0)
 						// bufferedFileOutputStream.write(block, 0, numBytes);

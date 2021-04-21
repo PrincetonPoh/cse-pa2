@@ -63,16 +63,16 @@ public abstract class CP2 {
 			PublicKey key = caCert4Checking.getPublicKey();
 
 			// Generate nonce
-			System.out.println("Gen nonce");
+			System.out.println("Retrieve nonce");
 			SecureRandom rand = new SecureRandom();
 			rand.nextBytes(nonce);
-			System.out.println("Sent to server");
+			System.out.println("Sending to server now");
 			toServer.write(nonce);
 
 			// Get encrypted nonce from server
 			System.out.println("Getting the encrypted nonce from server side");
 			fromServer.read(encryptedNonce);
-			System.out.println("Getting the encoded cert");
+			// System.out.println("Getting the encoded cert");
 			X509Certificate CertFromServer = (X509Certificate) cFactory.generateCertificate(fromServer);
 
 			// check the cert using my public key
@@ -81,13 +81,12 @@ public abstract class CP2 {
 			CertFromServer.verify(key);
 
 			// Verify that i'm the one who created the nonce using server's public key
-			// getting server's public key
-			PublicKey serverKey = CertFromServer.getPublicKey();
+			PublicKey serverKey = CertFromServer.getPublicKey();	// getting server's public key
 			Cipher settingForDecipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			settingForDecipher.init(Cipher.DECRYPT_MODE, serverKey);
 			byte[] decryptedNonce = settingForDecipher.doFinal(encryptedNonce);
 
-			if (Arrays.equals(nonce, decryptedNonce)) {
+			if (Arrays.equals( nonce, decryptedNonce )) {
 				System.out.println("Server is verified already....move on");
 			} else {
 				// indicate in attack
@@ -158,7 +157,8 @@ public abstract class CP2 {
 
 				System.out.println("Finished sending " + filename);
 
-				if (i == args.length -1) {
+				int argsLength = args.length - 1; 
+				if (i == argsLength) {
 					// indicate to server it is the end
 					toServer.writeInt(4);
 					bufferedFileInputStm.close();

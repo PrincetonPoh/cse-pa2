@@ -50,28 +50,29 @@ public abstract class SP1 {
 					CertificateFactory cf = CertificateFactory.getInstance("X.509");
 					X509Certificate serverCert =(X509Certificate) cf.generateCertificate(fis);
 					byte[] serverCertEncoded = serverCert.getEncoded();
+					// Must use read fully!
+					// See: https://stackoverflow.com/questions/25897627/datainputstream-read-vs-datainputstream-readfully
 					// PublicKey key = serverCert.getPublicKey();
 
 					// get nonce from client
-					System.out.println("Get nonce from client");
+					System.out.println("Retrieve nonce from client");
 					fromClient.read(nonce);
-					// encrypt nonce for client
-					System.out.println("Encrypt nonce for client");
-					Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-					byte[] encryptedNonce = cipher.doFinal(nonce);
+					Cipher cipherSettings = Cipher.getInstance("RSA/ECB/PKCS1Padding");	// encrypt nonce for client
+					cipherSettings.init(Cipher.ENCRYPT_MODE, privateKey);
+					byte[] encryptedNonce = cipherSettings.doFinal(nonce);
+
 					// send nonce to client
 					System.out.println("Sent encrypted nonce to client");
 					toClient.write(encryptedNonce);
 					toClient.flush();
 
-					// * send cert to client
-					System.out.println("Sent encoded cert to client");
+					// send cert to client
+					System.out.println("Sending the encoded cert to client");
 					// toClient.writeInt(serverCertEncoded.length);
 					toClient.write(serverCertEncoded);
 					toClient.flush();
 
-					// * Authentication Protocol done after client verifies
+					/////////// AP done
 				} 
 
 
@@ -82,8 +83,6 @@ public abstract class SP1 {
 
 					int numBytes = fromClient.readInt();
 					byte [] filename = new byte[numBytes];
-					// Must use read fully!
-					// See: https://stackoverflow.com/questions/25897627/datainputstream-read-vs-datainputstream-readfully
 					fromClient.readFully(filename, 0, numBytes);
 
 					fileOutputStream = new FileOutputStream("recv_" + new String(filename, 0, numBytes));
@@ -97,9 +96,9 @@ public abstract class SP1 {
 					byte [] block = new byte[forEncryptNumBytes];
 					fromClient.readFully(block, 0, forEncryptNumBytes);
 					// decrupt using private key
-					Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-					decipher.init(Cipher.DECRYPT_MODE, privateKey);
-					byte[] decryptBlock = decipher.doFinal(block);
+					Cipher decipherSettings = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+					decipherSettings.init(Cipher.DECRYPT_MODE, privateKey);
+					byte[] decryptBlock = decipherSettings.doFinal(block);
 
 					if (numBytes > 0)
 						// bufferedFileOutputStream.write(block, 0, numBytes);
